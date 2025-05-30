@@ -1,0 +1,86 @@
+#define BLYNK_PRINT Serial
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+#include <LiquidCrystal_I2C.h>
+#include <Servo.h>
+
+// === GANTI DENGAN TOKEN, SSID, dan PASSWORD ANDA ===
+char auth[] = "BLYNK_AUTH_TOKEN";  // Ganti dengan Blynk token kamu
+char ssid[] = "NAMA_WIFI";         // Ganti dengan nama WiFi kamu
+char pass[] = "PASSWORD_WIFI";     // Ganti dengan password WiFi kamu
+
+// === Pin Sensor dan Aktuator (ubah sesuai NodeMCU) ===
+#define LDR_PIN A0
+#define TRIG_PIN D5
+#define ECHO_PIN D6
+#define PIR_PIN D7
+#define LED_PIN D4
+#define SERVO_PIN D3
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+Servo myServo;
+
+void setup() {
+  Serial.begin(9600);
+  Blynk.begin(auth, ssid, pass);
+
+  lcd.begin();
+  lcd.backlight();
+
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  pinMode(PIR_PIN, INPUT);
+  pinMode(LED_PIN, OUTPUT);
+
+  myServo.attach(SERVO_PIN);
+  myServo.write(0); // posisi awal
+}
+
+void loop() {
+  Blynk.run();
+
+  // === Sensor Ultrasonik ===
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+  long duration = pulseIn(ECHO_PIN, HIGH);
+  int distance = duration * 0.034 / 2;
+
+  // === Sensor LDR ===
+  int ldrValue = analogRead(LDR_PIN);
+
+  // === Sensor PIR ===
+  bool motion = digitalRead(PIR_PIN);
+
+  // === Logika Aktuator ===
+  if (motion || distance < 20) {
+    digitalWrite(LED_PIN, HIGH);
+    myServo.write(90);
+  } else {
+    digitalWrite(LED_PIN, LOW);
+    myServo.write(0);
+  }
+
+  // === LCD Display ===
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("LDR: "); lcd.print(ldrValue);
+  lcd.setCursor(0, 1);
+  lcd.print("Jrk: "); lcd.print(distance); lcd.print("cm");
+  delay(2000);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Motion: "); lcd.print(motion ? "Yes" : "No");
+  lcd.setCursor(0, 1);
+  lcd.print("Cahaya: ");
+  lcd.print(ldrValue < 500 ? "Gelap" : "Terang");
+  delay(2000);
+
+  // === Kirim ke Blynk ===
+  Blynk.virtualWrite(V0, ldrValue);         // LDR
+  Blynk.virtualWrite(V1, distance);         // Jarak
+  Blynk.virtualWrite(V2, motion);           // Motion
+  Blynk.virtualWrite(V3, ldrValue < 500 ? "Gelap" : "Terang");  // Keterangan Cahaya
+}
