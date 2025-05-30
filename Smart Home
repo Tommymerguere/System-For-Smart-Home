@@ -1,0 +1,85 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <Servo.h>
+
+// === Pin Sensor dan Aktuator ===
+#define LDR_PIN A0
+#define TRIG_PIN 6
+#define ECHO_PIN 7
+#define PIR_PIN 8
+#define LED_PIN 9
+#define SERVO_PIN 10
+
+// === Inisialisasi LCD dan Servo ===
+LiquidCrystal_I2C lcd(0x27, 16, 2);  // Ganti 0x3F jika 0x27 tidak cocok
+Servo myServo;
+
+void setup() {
+  Serial.begin(9600);
+
+  lcd.begin(16, 2);
+  lcd.backlight();
+
+  pinMode(LDR_PIN, INPUT);
+  pinMode(PIR_PIN, INPUT);
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  pinMode(LED_PIN, OUTPUT);
+
+  myServo.attach(SERVO_PIN);
+  myServo.write(0);  // Posisi awal servo
+
+  Serial.println("=== Sistem Sensor Aktif ===");
+}
+
+void loop() {
+  // === Baca LDR ===
+  int ldrValue = analogRead(LDR_PIN);
+
+  // === Baca Ultrasonik ===
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  long duration = pulseIn(ECHO_PIN, HIGH);
+  int distance = duration * 0.034 / 2; // dalam cm
+
+  // === Baca PIR ===
+  bool motionDetected = digitalRead(PIR_PIN);
+
+  // === Kendali Servo dan LED ===
+  if (motionDetected || distance < 20) {
+    digitalWrite(LED_PIN, HIGH);
+    myServo.write(90);  // Servo aktif
+  } else {
+    digitalWrite(LED_PIN, LOW);
+    myServo.write(0);   // Servo posisi awal
+  }
+
+  // === Tampilkan ke LCD ===
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("LDR: "); lcd.print(ldrValue);
+  lcd.setCursor(0, 1);
+  lcd.print("Jarak: "); lcd.print(distance); lcd.print("cm");
+  delay(2000);
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Gerakan: ");
+  lcd.print(motionDetected ? "Ada" : "Tidak");
+  lcd.setCursor(0, 1);
+  lcd.print("Cahaya: ");
+  lcd.print(ldrValue < 500 ? "Gelap" : "Terang");
+  delay(2000);
+
+  // === Tampilkan ke Serial Monitor ===
+  Serial.println("=== Data Sensor ===");
+  Serial.print("LDR: "); Serial.println(ldrValue);
+  Serial.print("Jarak: "); Serial.print(distance); Serial.println(" cm");
+  Serial.print("Gerakan: "); Serial.println(motionDetected ? "Terdeteksi" : "Tidak Ada");
+  Serial.print("Cahaya: "); Serial.println(ldrValue < 500 ? "Gelap" : "Terang");
+  Serial.println("===================");
+}
